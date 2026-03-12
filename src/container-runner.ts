@@ -179,6 +179,22 @@ function buildVolumeMounts(
     });
   }
 
+  // Google Calendar credentials directory
+  const calendarDir = path.join(homeDir, '.config', 'google-calendar-mcp');
+  if (fs.existsSync(calendarDir)) {
+    // Copy OAuth keys alongside the tokens so the MCP server can find them
+    const oauthKeySrc = path.join(gmailDir, 'gcp-oauth.keys.json');
+    const oauthKeyDst = path.join(calendarDir, 'gcp-oauth.keys.json');
+    if (fs.existsSync(oauthKeySrc) && !fs.existsSync(oauthKeyDst)) {
+      fs.copyFileSync(oauthKeySrc, oauthKeyDst);
+    }
+    mounts.push({
+      hostPath: calendarDir,
+      containerPath: '/home/node/.google-calendar',
+      readonly: false,
+    });
+  }
+
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
   const groupIpcDir = resolveGroupIpcPath(group.folder);
@@ -212,6 +228,21 @@ function buildVolumeMounts(
   mounts.push({
     hostPath: groupAgentRunnerDir,
     containerPath: '/app/src',
+    readonly: false,
+  });
+
+  // Pre-compiled JS cache — avoids recompiling TypeScript on every container run.
+  // Stored on the host so it persists across container invocations.
+  const groupAgentRunnerDist = path.join(
+    DATA_DIR,
+    'sessions',
+    group.folder,
+    'agent-runner-dist',
+  );
+  fs.mkdirSync(groupAgentRunnerDist, { recursive: true });
+  mounts.push({
+    hostPath: groupAgentRunnerDist,
+    containerPath: '/tmp/dist',
     readonly: false,
   });
 

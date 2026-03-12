@@ -39,6 +39,7 @@ import {
   setRegisteredGroup,
   setRouterState,
   setSession,
+  deleteSession,
   storeChatMetadata,
   storeMessage,
 } from './db.js';
@@ -245,10 +246,17 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         { group: group.name },
         'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
       );
+      // Clear the session so the next message starts fresh rather than resuming a broken session
+      delete sessions[group.folder];
+      deleteSession(group.folder);
       return true;
     }
-    // Roll back cursor so retries can re-process these messages
+    // Roll back cursor so retries can re-process these messages.
+    // Also clear the session so the retry starts a fresh Claude session
+    // rather than resuming the broken one (which would just fail again).
     lastAgentTimestamp[chatJid] = previousCursor;
+    delete sessions[group.folder];
+    deleteSession(group.folder);
     saveState();
     logger.warn(
       { group: group.name },
