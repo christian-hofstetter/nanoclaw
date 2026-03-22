@@ -25,10 +25,17 @@ const SUGGEST_PATTERN = /<!--\s*suggest:\s*([^-]+?)-->/gi;
  */
 function parseSuggestions(text: string): { text: string; buttons: string[] } {
   const buttons: string[] = [];
-  const cleaned = text.replace(SUGGEST_PATTERN, (_match, labels: string) => {
-    buttons.push(...labels.split('|').map((b) => b.trim()).filter(Boolean));
-    return '';
-  }).trim();
+  const cleaned = text
+    .replace(SUGGEST_PATTERN, (_match, labels: string) => {
+      buttons.push(
+        ...labels
+          .split('|')
+          .map((b) => b.trim())
+          .filter(Boolean),
+      );
+      return '';
+    })
+    .trim();
   return { text: cleaned, buttons };
 }
 
@@ -48,13 +55,14 @@ async function sendTelegramMessage(
 ): Promise<void> {
   const { text: cleanText, buttons } = parseSuggestions(text);
 
-  const replyMarkup = buttons.length > 0
-    ? {
-        keyboard: buttons.map((label) => [{ text: label }]),
-        one_time_keyboard: true,
-        resize_keyboard: true,
-      }
-    : { remove_keyboard: true as const };
+  const replyMarkup =
+    buttons.length > 0
+      ? {
+          keyboard: buttons.map((label) => [{ text: label }]),
+          one_time_keyboard: true,
+          resize_keyboard: true,
+        }
+      : { remove_keyboard: true as const };
 
   try {
     await api.sendMessage(chatId, cleanText, {
@@ -108,9 +116,8 @@ export class TelegramChannel implements Channel {
     });
 
     this.bot.on('message:text', async (ctx) => {
-      // Skip built-in bot commands (handled separately above)
-      if (ctx.message.text === '/chatid' || ctx.message.text === '/ping')
-        return;
+      // Skip all bot commands (handled separately above or irrelevant)
+      if (ctx.message.text?.startsWith('/')) return;
 
       const chatJid = `tg:${ctx.chat.id}`;
       let content = ctx.message.text;

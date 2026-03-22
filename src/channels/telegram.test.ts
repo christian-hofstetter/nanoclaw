@@ -710,7 +710,7 @@ describe('TelegramChannel', () => {
       expect(currentBot().api.sendMessage).toHaveBeenCalledWith(
         '100200300',
         'Hello',
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
       );
     });
 
@@ -724,7 +724,7 @@ describe('TelegramChannel', () => {
       expect(currentBot().api.sendMessage).toHaveBeenCalledWith(
         '-1001234567890',
         'Group message',
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
       );
     });
 
@@ -741,13 +741,13 @@ describe('TelegramChannel', () => {
         1,
         '100200300',
         'x'.repeat(4096),
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
       );
       expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
         2,
         '100200300',
         'x'.repeat(904),
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
       );
     });
 
