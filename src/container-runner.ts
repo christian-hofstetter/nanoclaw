@@ -27,8 +27,18 @@ import {
   stopContainer,
 } from './container-runtime.js';
 import { detectAuthMode } from './credential-proxy.js';
+import { readEnvFile } from './env.js';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
+
+const envSecrets = readEnvFile([
+  'GITHUB_TOKEN',
+  'GOOGLE_ADS_DEVELOPER_TOKEN',
+  'GOOGLE_ADS_CLIENT_ID',
+  'GOOGLE_ADS_CLIENT_SECRET',
+  'GOOGLE_ADS_REFRESH_TOKEN',
+  'GOOGLE_ADS_DEFAULT_CUSTOMER_ID',
+]);
 
 // Sentinel markers for robust output parsing (must match agent-runner)
 const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
@@ -162,6 +172,23 @@ function buildVolumeMounts(
       fs.cpSync(srcDir, dstDir, { recursive: true });
     }
   }
+
+  // Sync agents from container/agents/ and group-specific .claude/agents/
+  const agentsDst = path.join(groupSessionsDir, 'agents');
+  const agentsSources = [
+    path.join(process.cwd(), 'container', 'agents'),
+    path.join(groupDir, '.claude', 'agents'),
+  ];
+  for (const agentsSrc of agentsSources) {
+    if (!fs.existsSync(agentsSrc)) continue;
+    fs.mkdirSync(agentsDst, { recursive: true });
+    for (const agentFile of fs.readdirSync(agentsSrc)) {
+      const srcFile = path.join(agentsSrc, agentFile);
+      if (!fs.statSync(srcFile).isFile()) continue;
+      fs.copyFileSync(srcFile, path.join(agentsDst, agentFile));
+    }
+  }
+
   mounts.push({
     hostPath: groupSessionsDir,
     containerPath: '/home/node/.claude',
@@ -192,6 +219,38 @@ function buildVolumeMounts(
       hostPath: calendarDir,
       containerPath: '/home/node/.google-calendar',
       readonly: false,
+    });
+  }
+
+  // Google Ads credentials directory
+  const googleAdsDir = path.join(homeDir, '.google-ads-mcp');
+  if (fs.existsSync(googleAdsDir)) {
+    mounts.push({
+      hostPath: googleAdsDir,
+      containerPath: '/home/node/.google-ads-mcp',
+      readonly: true,
+    });
+  }
+
+  // Google Ads MCP is installed inside the container image (see Dockerfile)
+
+  // SimplInvoice MCP server (private repo, cloned to ~/mcp-simplinvoice)
+  const simplinvoiceDir = path.join(homeDir, 'mcp-simplinvoice');
+  if (fs.existsSync(simplinvoiceDir)) {
+    mounts.push({
+      hostPath: simplinvoiceDir,
+      containerPath: '/home/node/mcp-simplinvoice',
+      readonly: false, // config.json updated on OAuth refresh; data/ needs writes
+    });
+  }
+
+  // Invoice source directory for SimplInvoice
+  const myCloudDir = '/mnt/mycloud';
+  if (fs.existsSync(myCloudDir)) {
+    mounts.push({
+      hostPath: myCloudDir,
+      containerPath: '/mnt/mycloud',
+      readonly: false, // invoices are moved to processed/ after booking
     });
   }
 
@@ -273,6 +332,25 @@ function buildContainerArgs(
     '-e',
     `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`,
   );
+
+  // GitHub token — forwarded so the GitHub MCP server and git CLI can authenticate
+  const githubToken = envSecrets.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+  if (githubToken) {
+    args.push('-e', `GITHUB_TOKEN=${githubToken}`);
+  }
+
+  // Google Ads credentials — forwarded to the google-ads MCP server
+  const googleAdsVars = [
+    'GOOGLE_ADS_DEVELOPER_TOKEN',
+    'GOOGLE_ADS_CLIENT_ID',
+    'GOOGLE_ADS_CLIENT_SECRET',
+    'GOOGLE_ADS_REFRESH_TOKEN',
+    'GOOGLE_ADS_DEFAULT_CUSTOMER_ID',
+  ] as const;
+  for (const key of googleAdsVars) {
+    const val = envSecrets[key] || process.env[key];
+    if (val) args.push('-e', `${key}=${val}`);
+  }
 
   // Mirror the host's auth method with a placeholder value.
   // API key mode: SDK sends x-api-key, proxy replaces with real key.

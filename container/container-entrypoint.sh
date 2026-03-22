@@ -8,7 +8,7 @@ HASH_FILE="/tmp/dist/.src-hash"
 
 if [ ! -f "/tmp/dist/index.js" ] || [ ! -f "$HASH_FILE" ] || [ "$(cat $HASH_FILE 2>/dev/null)" != "$SRC_HASH" ]; then
   cd /app && npx tsc --outDir /tmp/dist 2>&1 >&2
-  ln -sf /app/node_modules /tmp/dist/node_modules
+  rm -f /tmp/dist/node_modules && ln -s /app/node_modules /tmp/dist/node_modules
   echo "$SRC_HASH" > "$HASH_FILE"
 fi
 

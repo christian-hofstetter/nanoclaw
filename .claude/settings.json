@@ -1,1 +1,11 @@
-{}
+{
+  "mcpServers": {
+    "google-ads-mcp": {
+      "command": "/home/nanoclaw/.local/bin/google-ads-mcp",
+      "args": [],
+      "env": {
+        "GOOGLE_ADS_CONFIGURATION_FILE_PATH": "/home/nanoclaw/.google-ads-mcp/google-ads.yaml"
+      }
+    }
+  }
+}
