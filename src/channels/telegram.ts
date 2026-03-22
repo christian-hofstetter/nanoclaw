@@ -17,10 +17,28 @@ export interface TelegramChannelOpts {
   registeredGroups: () => Record<string, RegisteredGroup>;
 }
 
+const SUGGEST_PATTERN = /<!--\s*suggest:\s*([^-]+?)-->/gi;
+
+/**
+ * Parse <!-- suggest: Button 1 | Button 2 --> tags from message text.
+ * Returns the cleaned text and an array of button labels.
+ */
+function parseSuggestions(text: string): { text: string; buttons: string[] } {
+  const buttons: string[] = [];
+  const cleaned = text.replace(SUGGEST_PATTERN, (_match, labels: string) => {
+    buttons.push(...labels.split('|').map((b) => b.trim()).filter(Boolean));
+    return '';
+  }).trim();
+  return { text: cleaned, buttons };
+}
+
 /**
  * Send a message with Telegram Markdown parse mode, falling back to plain text.
  * Claude's output naturally matches Telegram's Markdown v1 format:
  *   *bold*, _italic_, `code`, ```code blocks```, [links](url)
+ *
+ * If the text contains <!-- suggest: A | B | C --> tags, the buttons are
+ * extracted and sent as a one-time reply keyboard below the message.
  */
 async function sendTelegramMessage(
   api: { sendMessage: Api['sendMessage'] },
@@ -28,15 +46,29 @@ async function sendTelegramMessage(
   text: string,
   options: { message_thread_id?: number } = {},
 ): Promise<void> {
+  const { text: cleanText, buttons } = parseSuggestions(text);
+
+  const replyMarkup = buttons.length > 0
+    ? {
+        keyboard: buttons.map((label) => [{ text: label }]),
+        one_time_keyboard: true,
+        resize_keyboard: true,
+      }
+    : { remove_keyboard: true as const };
+
   try {
-    await api.sendMessage(chatId, text, {
+    await api.sendMessage(chatId, cleanText, {
       ...options,
       parse_mode: 'Markdown',
+      reply_markup: replyMarkup,
     });
   } catch (err) {
     // Fallback: send as plain text if Markdown parsing fails
     logger.debug({ err }, 'Markdown send failed, falling back to plain text');
-    await api.sendMessage(chatId, text, options);
+    await api.sendMessage(chatId, cleanText, {
+      ...options,
+      reply_markup: replyMarkup,
+    });
   }
 }
 

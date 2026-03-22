@@ -34,6 +34,18 @@ Here are the key findings from the research...
 
 Text inside `<internal>` tags is logged but not sent to the user. If you've already sent the key information via `send_message`, you can wrap the recap in `<internal>` to avoid sending it again.
 
+### Suggested replies (Telegram buttons)
+
+Add a `<!-- suggest: ... -->` tag to your message to show tappable reply buttons in Telegram. The user taps one and it's sent as a normal message.
+
+```
+Should I book this for next Tuesday?
+
+<!-- suggest: Yes, book it | No, skip | Show me the details first -->
+```
+
+Use this when there are 2–4 obvious next steps. Don't use it for open-ended questions. Each button should be short (under 30 chars).
+
 ### Sub-agents and teammates
 
 When working as a sub-agent or teammate, only use `send_message` if instructed to by the main agent.
