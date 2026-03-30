@@ -38,6 +38,11 @@ const envSecrets = readEnvFile([
   'GOOGLE_ADS_CLIENT_SECRET',
   'GOOGLE_ADS_REFRESH_TOKEN',
   'GOOGLE_ADS_DEFAULT_CUSTOMER_ID',
+  'ALPACA_API_KEY',
+  'ALPACA_SECRET_KEY',
+  'ALPACA_PAPER',
+  'ALPACA_MAX_ORDER_USD',
+  'ALPACA_MAX_TOTAL_USD',
 ]);
 
 // Sentinel markers for robust output parsing (must match agent-runner)
@@ -65,6 +70,52 @@ interface VolumeMount {
   hostPath: string;
   containerPath: string;
   readonly: boolean;
+}
+
+function buildContainerSettings(homeDir: string): Record<string, unknown> {
+  const settings: Record<string, unknown> = {
+    env: {
+      // Enable agent swarms (subagent orchestration)
+      // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
+      CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+      // Load CLAUDE.md from additional mounted directories
+      // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
+      CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+      // Enable Claude's memory feature (persists user preferences between sessions)
+      // https://code.claude.com/docs/en/memory#manage-auto-memory
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+    },
+  };
+  const mcpServers = buildMcpServersConfig(homeDir);
+  if (Object.keys(mcpServers).length > 0) {
+    settings.mcpServers = mcpServers;
+  }
+  return settings;
+}
+
+function mergeContainerSettings(
+  existing: Record<string, unknown>,
+  homeDir: string,
+): Record<string, unknown> {
+  const mcpServers = buildMcpServersConfig(homeDir);
+  if (Object.keys(mcpServers).length === 0) return existing;
+  const existingMcp = (existing.mcpServers as Record<string, unknown>) || {};
+  return {
+    ...existing,
+    mcpServers: { ...existingMcp, ...mcpServers },
+  };
+}
+
+function buildMcpServersConfig(homeDir: string): Record<string, unknown> {
+  const servers: Record<string, unknown> = {};
+  const alpacaDir = path.join(homeDir, 'mcp-alpaca');
+  if (fs.existsSync(alpacaDir)) {
+    servers.alpaca = {
+      command: 'node',
+      args: ['/home/node/mcp-alpaca/index.mjs'],
+    };
+  }
+  return servers;
 }
 
 function buildVolumeMounts(
@@ -133,28 +184,26 @@ function buildVolumeMounts(
     '.claude',
   );
   fs.mkdirSync(groupSessionsDir, { recursive: true });
+  const homeDir = os.homedir();
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
     fs.writeFileSync(
       settingsFile,
       JSON.stringify(
-        {
-          env: {
-            // Enable agent swarms (subagent orchestration)
-            // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
-            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-            // Load CLAUDE.md from additional mounted directories
-            // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
-            CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-            // Enable Claude's memory feature (persists user preferences between sessions)
-            // https://code.claude.com/docs/en/memory#manage-auto-memory
-            CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-          },
-        },
+        buildContainerSettings(homeDir),
         null,
         2,
       ) + '\n',
     );
+  } else {
+    // Patch existing settings to add any missing MCP servers
+    try {
+      const existing = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+      const updated = mergeContainerSettings(existing, homeDir);
+      fs.writeFileSync(settingsFile, JSON.stringify(updated, null, 2) + '\n');
+    } catch {
+      // Leave file as-is if parse fails
+    }
   }
 
   // Sync skills from container/skills/ and group-specific .claude/skills/
@@ -196,7 +245,6 @@ function buildVolumeMounts(
   });
 
   // Gmail credentials directory (for Gmail MCP inside the container)
-  const homeDir = os.homedir();
   const gmailDir = path.join(homeDir, '.gmail-mcp');
   if (fs.existsSync(gmailDir)) {
     mounts.push({
@@ -233,6 +281,16 @@ function buildVolumeMounts(
   }
 
   // Google Ads MCP is installed inside the container image (see Dockerfile)
+
+  // Alpaca trading MCP server (mounted from host ~/mcp-alpaca)
+  const alpacaDir = path.join(homeDir, 'mcp-alpaca');
+  if (fs.existsSync(alpacaDir)) {
+    mounts.push({
+      hostPath: alpacaDir,
+      containerPath: '/home/node/mcp-alpaca',
+      readonly: true,
+    });
+  }
 
   // SimplInvoice MCP server (private repo, cloned to ~/mcp-simplinvoice)
   const simplinvoiceDir = path.join(homeDir, 'mcp-simplinvoice');
@@ -348,6 +406,19 @@ function buildContainerArgs(
     'GOOGLE_ADS_DEFAULT_CUSTOMER_ID',
   ] as const;
   for (const key of googleAdsVars) {
+    const val = envSecrets[key] || process.env[key];
+    if (val) args.push('-e', `${key}=${val}`);
+  }
+
+  // Alpaca trading credentials — forwarded to the alpaca MCP server
+  const alpacaVars = [
+    'ALPACA_API_KEY',
+    'ALPACA_SECRET_KEY',
+    'ALPACA_PAPER',
+    'ALPACA_MAX_ORDER_USD',
+    'ALPACA_MAX_TOTAL_USD',
+  ] as const;
+  for (const key of alpacaVars) {
     const val = envSecrets[key] || process.env[key];
     if (val) args.push('-e', `${key}=${val}`);
   }
