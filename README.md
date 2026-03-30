@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://nanoclaw.dev">nanoclaw.dev</a>&nbsp; • &nbsp;
+  <a href="https://docs.nanoclaw.dev">docs</a>&nbsp; • &nbsp;
   <a href="README_zh.md">中文</a>&nbsp; • &nbsp;
   <a href="repo-tokens"><img src="repo-tokens/badge.svg" alt="34.9k tokens, 17% of context window" valign="middle"></a>
 </p>
@@ -66,7 +67,7 @@ Then run `/setup`. Claude Code handles everything: dependencies, authentication,
 ## What It Supports
 
 - **Multi-channel messaging** — Talk to your assistant from WhatsApp, Telegram, Discord, Slack, or Gmail. Add channels with skills like `/add-whatsapp` or `/add-telegram`. Run one or many at the same time.
-- **Isolated group context** — Each group has its own `CLAUDE.md` memory, isolated filesystem, and runs in its own container sandbox.
+- **Isolated group context** — Each group has its own `CLAUDE.md` memory, isolated filesystem, and runs in its own container sandbox with only that filesystem mounted to it.
 - **Main channel** — Your private channel (self-chat) for admin control; every group is completely isolated.
 - **Scheduled tasks** — Recurring jobs that run Claude and can message you back.
 - **Web access** — Search and fetch content from the web.
@@ -126,6 +127,22 @@ NanoClaw doesn't use configuration files. To make changes, just tell Claude Code
 Or run `/customize` for guided changes.
 
 The codebase is small enough that Claude can safely modify it.
+
+## Contributing
+
+**Don't add features. Add skills.**
+
+If you want to add Telegram support, don't create a PR that adds Telegram to the core codebase. Instead, fork NanoClaw, make the code changes on a branch, and open a PR. We'll create a `skill/telegram` branch from your PR that other users can merge into their fork.
+
+Users then run `/add-telegram` on their fork and get clean code that does exactly what they need, not a bloated system trying to support every use case.
+
+### RFS (Request for Skills)
+
+Skills we'd like to see:
+
+**Communication Channels**
+- `/add-signal` - Add Signal as a channel
+
 
 ## Architecture
 
@@ -202,7 +219,11 @@ docker ps --format "{{.Names}}" | grep nanoclaw | xargs docker stop
 
 **Why Docker?**
 
-Docker provides cross-platform support and a mature ecosystem. On macOS, you can switch to Apple Container via `/convert-to-apple-container` for a lighter-weight native runtime.
+Docker provides cross-platform support (macOS, Linux and even Windows via WSL2) and a mature ecosystem. On macOS, you can optionally switch to Apple Container via `/convert-to-apple-container` for a lighter-weight native runtime.
+
+**Can I run this on Linux or Windows?**
+
+Yes. Docker is the default runtime and works on macOS, Linux, and Windows (via WSL2). Just run `/setup`.
 
 **Is this secure?**
 
@@ -245,7 +266,7 @@ Fork NanoClaw, make the code changes on a branch, and open a PR. We'll create a 
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for breaking changes and migration notes.
+See [CHANGELOG.md](CHANGELOG.md) for breaking changes, or the [full release history](https://docs.nanoclaw.dev/changelog) on the documentation site.
 
 ## License
 
