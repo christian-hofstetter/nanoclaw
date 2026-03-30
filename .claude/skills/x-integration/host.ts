@@ -8,8 +8,12 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import pino from 'pino';
 
-import { logger } from '../../../src/logger.js';
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: { target: 'pino-pretty', options: { colorize: true } }
+});
 
 interface SkillResult {
   success: boolean;

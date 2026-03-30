@@ -7,7 +7,7 @@
 | Main group | Trusted | Private self-chat, admin control |
 | Non-main groups | Untrusted | Other users may be malicious |
 | Container agents | Sandboxed | Isolated execution environment |
-| Incoming messages | User input | Potential prompt injection |
+| WhatsApp messages | User input | Potential prompt injection |
 
 ## Security Boundaries
 
@@ -64,22 +64,20 @@ Messages and task operations are verified against group identity:
 | View all tasks | ✓ | Own only |
 | Manage other groups | ✓ | ✗ |
 
-### 5. Credential Isolation (OneCLI Agent Vault)
+### 5. Credential Isolation (Credential Proxy)
 
-Real API credentials **never enter containers**. NanoClaw uses [OneCLI's Agent Vault](https://github.com/onecli/onecli) to proxy outbound requests and inject credentials at the gateway level.
+Real API credentials **never enter containers**. Instead, the host runs an HTTP credential proxy that injects authentication headers transparently.
 
 **How it works:**
-1. Credentials are registered once with `onecli secrets create`, stored and managed by OneCLI
-2. When NanoClaw spawns a container, it calls `applyContainerConfig()` to route outbound HTTPS through the OneCLI gateway
-3. The gateway matches requests by host and path, injects the real credential, and forwards
-4. Agents cannot discover real credentials — not in environment, stdin, files, or `/proc`
-
-**Per-agent policies:**
-Each NanoClaw group gets its own OneCLI agent identity. This allows different credential policies per group (e.g. your sales agent vs. support agent). OneCLI supports rate limits, and time-bound access and approval flows are on the roadmap.
+1. Host starts a credential proxy on `CREDENTIAL_PROXY_PORT` (default: 3001)
+2. Containers receive `ANTHROPIC_BASE_URL=http://host.docker.internal:<port>` and `ANTHROPIC_API_KEY=placeholder`
+3. The SDK sends API requests to the proxy with the placeholder key
+4. The proxy strips placeholder auth, injects real credentials (`x-api-key` or `Authorization: Bearer`), and forwards to `api.anthropic.com`
+5. Agents cannot discover real credentials — not in environment, stdin, files, or `/proc`
 
 **NOT Mounted:**
-- Channel auth sessions (`store/auth/`) — host only
-- Mount allowlist — external, never mounted
+- WhatsApp session (`store/auth/`) - host only
+- Mount allowlist - external, never mounted
 - Any credentials matching blocked patterns
 - `.env` is shadowed with `/dev/null` in the project root mount
 
@@ -99,7 +97,7 @@ Each NanoClaw group gets its own OneCLI agent identity. This allows different cr
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        UNTRUSTED ZONE                             │
-│  Incoming Messages (potentially malicious)                         │
+│  WhatsApp Messages (potentially malicious)                        │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Trigger check, input escaping
@@ -109,7 +107,7 @@ Each NanoClaw group gets its own OneCLI agent identity. This allows different cr
 │  • IPC authorization                                              │
 │  • Mount validation (external allowlist)                          │
 │  • Container lifecycle                                            │
-│  • OneCLI Agent Vault (injects credentials, enforces policies)   │
+│  • Credential proxy (injects auth headers)                       │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Explicit mounts only, no secrets
@@ -118,7 +116,7 @@ Each NanoClaw group gets its own OneCLI agent identity. This allows different cr
 │  • Agent execution                                                │
 │  • Bash commands (sandboxed)                                      │
 │  • File operations (limited to mounts)                            │
-│  • API calls routed through OneCLI Agent Vault                   │
+│  • API calls routed through credential proxy                     │
 │  • No real credentials in environment or filesystem              │
 └──────────────────────────────────────────────────────────────────┘
 ```
