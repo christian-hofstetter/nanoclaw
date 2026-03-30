@@ -189,11 +189,7 @@ function buildVolumeMounts(
   if (!fs.existsSync(settingsFile)) {
     fs.writeFileSync(
       settingsFile,
-      JSON.stringify(
-        buildContainerSettings(homeDir),
-        null,
-        2,
-      ) + '\n',
+      JSON.stringify(buildContainerSettings(homeDir), null, 2) + '\n',
     );
   } else {
     // Patch existing settings to add any missing MCP servers
