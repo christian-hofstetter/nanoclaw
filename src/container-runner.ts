@@ -438,6 +438,7 @@ function buildContainerArgs(
     if (val) args.push('-e', `${key}=${val}`);
   }
 
+
   // Mirror the host's auth method with a placeholder value.
   // API key mode: SDK sends x-api-key, proxy replaces with real key.
   // OAuth mode:   SDK exchanges placeholder token for temp API key,

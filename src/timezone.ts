@@ -1,3 +1,12 @@
+export function isValidTimezone(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Convert a UTC ISO timestamp to a localized display string.
  * Uses the Intl API (no external dependencies).
