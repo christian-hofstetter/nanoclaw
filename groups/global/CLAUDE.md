@@ -71,6 +71,16 @@ Use Slack mrkdwn syntax. Run `/slack-formatting` for the full reference. Key rul
 
 No `##` headings. No `[links](url)`. No `**double stars**`.
 
+#### Telegram tappable reply buttons
+
+For Telegram channels, you can offer tappable shortcut buttons by appending a `<!-- suggest: ... -->` tag at the end of your message:
+
+```
+<!-- suggest: Option A | Option B | Option C -->
+```
+
+Use this when the user has a clear set of likely next actions — e.g. after asking a question with a few natural answers, offering a menu, or confirming a choice. Keep labels short (1–4 words). Use 2–4 options at most. Do not use it for open-ended replies where free text is more appropriate.
+
 ### Discord channels (folder starts with `discord_`)
 
 Standard Markdown works: `**bold**`, `*italic*`, `[links](url)`, `# headings`.
