@@ -486,6 +486,7 @@ async function runQuery(
         'mcp__google-ads__*',
         'mcp__github__*',
         'mcp__simplinvoice__*',
+        'mcp__qmd__*',
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -534,6 +535,10 @@ async function runQuery(
             GOOGLE_ADS_REFRESH_TOKEN: process.env.GOOGLE_ADS_REFRESH_TOKEN || '',
             GOOGLE_ADS_DEFAULT_CUSTOMER_ID: process.env.GOOGLE_ADS_DEFAULT_CUSTOMER_ID || '',
           },
+        },
+        qmd: {
+          type: 'http',
+          url: 'http://host.docker.internal:8182/mcp',
         },
       },
       hooks: {
